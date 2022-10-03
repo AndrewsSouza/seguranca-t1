@@ -15,13 +15,13 @@ const PORTUGUESE = {
 }
 
 function findKey(cypheredText) {
-    let keyLength = -1
+    const possibleSubdivisions = []
     let subdivisions
-    let language
 
     // find key and language
     for (let keyLengthAttempt = 2; keyLengthAttempt <= MAX_KEY_LENGTH; keyLengthAttempt++) {
         subdivisions = []
+        let language
 
         // initiate subdivisions array
         for (let i = 0; i < keyLengthAttempt; i++) {
@@ -52,20 +52,29 @@ function findKey(cypheredText) {
         })
 
         if (iocMatched) {
-            keyLength = keyLengthAttempt
-            break
+            possibleSubdivisions.push({ subdivisions: [...subdivisions], language })
         }
     }
 
-    if (!language || keyLength < 0) {
+    if (possibleSubdivisions.length < 1) {
         throw new Error("Language not found!")
     }
 
+    //find best subdivisions and key length
+    const bestSubdivisions = possibleSubdivisions.sort(({ subdivisions: subA, language: langA }, { subdivisions: subB, language: langB }) => {
+        const minDiffSubA = subA.map(({ ioc }) => Math.abs(ioc - langA.IOC)).sort()[0]
+        const minDiffSubB = subB.map(({ ioc }) => Math.abs(ioc - langB.IOC)).sort()[0]
+
+        if (minDiffSubA > minDiffSubB) return -1
+        if (minDiffSubA < minDiffSubB) return 1
+    })[0]
+
+    const keyLength = bestSubdivisions.subdivisions.length
     let key = ""
 
     // find key
-    for (let i = 0; i < subdivisions.length; i++) {
-        const letterFrequency = getFrequency(subdivisions[i].string)
+    for (let i = 0; i < keyLength; i++) {
+        const letterFrequency = getFrequency(bestSubdivisions.subdivisions[i].string)
         let mostFrequentLetter
         let secondMostFrequentLetter
 
@@ -80,10 +89,10 @@ function findKey(cypheredText) {
         }
 
         // find number of shifts (displacement)
-        const displacement = Math.abs(alphabetIndex(mostFrequentLetter) - alphabetIndex(language.MOST_FREQUENT_LETTER))
+        const displacement = Math.abs(alphabetIndex(mostFrequentLetter) - alphabetIndex(bestSubdivisions.language.MOST_FREQUENT_LETTER))
 
-        if (language.TRY_SECOND_MOST_FREQUENT_LETTER) {
-            const displacementSecondMostFrequentLetter = Math.abs(alphabetIndex(secondMostFrequentLetter) - alphabetIndex(language.MOST_FREQUENT_LETTER))
+        if (bestSubdivisions.language.TRY_SECOND_MOST_FREQUENT_LETTER) {
+            const displacementSecondMostFrequentLetter = Math.abs(alphabetIndex(secondMostFrequentLetter) - alphabetIndex(bestSubdivisions.language.MOST_FREQUENT_LETTER))
             key = key.concat(letterFromAlphabetIndex(displacement <= displacementSecondMostFrequentLetter ? displacement : displacementSecondMostFrequentLetter))
         } else {
             key = key.concat(letterFromAlphabetIndex(displacement))
